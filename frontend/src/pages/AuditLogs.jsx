@@ -1,0 +1,1 @@
+export { AuditLogs as default } from './other-pages'
