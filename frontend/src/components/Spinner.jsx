@@ -1,5 +1,5 @@
-export { default } from './index.jsx'
 import React from 'react'
+
 export default function Spinner({ fullscreen, size = 'md' }) {
   if (fullscreen) {
     return (
