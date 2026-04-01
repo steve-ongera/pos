@@ -45,38 +45,31 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      {/* Animated background */}
       <div className="login-bg">
         <div className="login-bg-pattern" />
       </div>
 
       <div className="login-container">
-        {/* Brand panel */}
-        <div className="login-brand-panel">
-          <div className="login-brand-content">
-            <div className="login-brand-logo">
+        {/* Single centered card */}
+        <div className="login-card">
+
+          {/* Card header with brand */}
+          <div className="login-card-header">
+            <div className="login-logo-wrap">
               <i className="bi bi-shop-window" />
             </div>
-            <h1 className="login-brand-name">NaivasPOS</h1>
-            <p className="login-brand-tagline">Professional Point of Sale System</p>
-            <div className="login-features">
-              <div className="login-feature"><i className="bi bi-phone" /><span>M-Pesa STK Push</span></div>
-              <div className="login-feature"><i className="bi bi-award" /><span>Loyalty Points</span></div>
-              <div className="login-feature"><i className="bi bi-upc-scan" /><span>Barcode Ready</span></div>
-              <div className="login-feature"><i className="bi bi-shield-check" /><span>Secure & Audited</span></div>
-            </div>
+            <span className="login-brand-name">NaivasPOS</span>
+            <span className="login-brand-tagline">Professional Point of Sale System</span>
           </div>
-        </div>
 
-        {/* Form panel */}
-        <div className="login-form-panel">
-          <div className="login-form-inner">
-            <div className="login-form-header">
-              <h2>Welcome back</h2>
-              <p>Sign in to access your POS terminal</p>
-            </div>
+          {/* Card body with form */}
+          <div className="login-card-body">
+            <h2>Welcome back</h2>
+            <p>Sign in to access your POS terminal</p>
 
             {errors.general && (
-              <div className="alert alert-error">
+              <div className="alert alert-error" style={{ marginBottom: '20px' }}>
                 <i className="bi bi-exclamation-circle-fill" />
                 {errors.general}
               </div>
@@ -97,7 +90,11 @@ export default function Login() {
                     autoFocus
                   />
                 </div>
-                {errors.email && <span className="form-error"><i className="bi bi-exclamation-circle" /> {errors.email}</span>}
+                {errors.email && (
+                  <span className="form-error">
+                    <i className="bi bi-exclamation-circle" /> {errors.email}
+                  </span>
+                )}
               </div>
 
               <div className="form-field">
@@ -112,14 +109,28 @@ export default function Login() {
                     onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                     autoComplete="current-password"
                   />
-                  <button type="button" className="input-action" onClick={() => setShowPass(s => !s)} tabIndex={-1}>
+                  <button
+                    type="button"
+                    className="input-action"
+                    onClick={() => setShowPass(s => !s)}
+                    tabIndex={-1}
+                  >
                     <i className={`bi ${showPass ? 'bi-eye-slash' : 'bi-eye'}`} />
                   </button>
                 </div>
-                {errors.password && <span className="form-error"><i className="bi bi-exclamation-circle" /> {errors.password}</span>}
+                {errors.password && (
+                  <span className="form-error">
+                    <i className="bi bi-exclamation-circle" /> {errors.password}
+                  </span>
+                )}
               </div>
 
-              <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
+              <button
+                type="submit"
+                className="btn btn-primary btn-full btn-lg"
+                disabled={loading}
+                style={{ marginTop: '4px' }}
+              >
                 {loading ? (
                   <><div className="spinner-ring spinner-sm" /> Signing in...</>
                 ) : (

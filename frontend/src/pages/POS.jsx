@@ -6,9 +6,9 @@ import { Modal } from '../components/index.jsx'
 
 const fmt = (n) => `KES ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`
 const PAYMENT_METHODS = [
-  { key: 'cash', label: 'Cash', icon: 'bi-cash-coin' },
+  { key: 'cash',  label: 'Cash',  icon: 'bi-cash-coin' },
   { key: 'mpesa', label: 'M-Pesa', icon: 'bi-phone' },
-  { key: 'card', label: 'Card', icon: 'bi-credit-card' },
+  { key: 'card',  label: 'Card',  icon: 'bi-credit-card' },
   { key: 'mixed', label: 'Mixed', icon: 'bi-layers' },
 ]
 
@@ -31,6 +31,9 @@ export default function POS() {
   const [drawer, setDrawer] = useState(null)
   const [loading, setLoading] = useState(false)
   const [productLoading, setProductLoading] = useState(true)
+
+  // Mobile cart drawer state
+  const [cartOpen, setCartOpen] = useState(false)
 
   // Modals
   const [showCheckout, setShowCheckout] = useState(false)
@@ -56,7 +59,7 @@ export default function POS() {
   const [customerResults, setCustomerResults] = useState([])
   const [customerLoading, setCustomerLoading] = useState(false)
 
-  const barcodeRef = useRef('')
+  const barcodeRef  = useRef('')
   const barcodeTimer = useRef(null)
   const mpesaPollRef = useRef(null)
   const searchInputRef = useRef(null)
@@ -146,7 +149,7 @@ export default function POS() {
   const discountAmount = discount.type === 'percent'
     ? subtotal * (discount.value / 100)
     : Number(discount.value) || 0
-  const pointsValue = pointsToRedeem * 1 // 1 point = KES 1
+  const pointsValue = pointsToRedeem * 1
   const total = Math.max(subtotal - discountAmount - pointsValue, 0)
   const change = paymentMethod === 'cash' ? Math.max(Number(amountPaid) - total, 0) : 0
   const pointsEarnable = customer ? Math.floor(total) : 0
@@ -229,7 +232,6 @@ export default function POS() {
       })
       setCheckoutRequestId(data.checkout_request_id)
       if (data.debug) {
-        // Debug bypass: sale already completed
         const { data: freshSale } = await salesAPI.detail(sale.id)
         setCompletedSale(freshSale)
         setMpesaStatus('completed')
@@ -287,27 +289,39 @@ export default function POS() {
     } catch (err) { flash(err.response?.data?.error || 'Failed', 'error') }
   }
 
+  const openCart = () => setCartOpen(true)
+  const closeCart = () => setCartOpen(false)
+
   return (
     <div className="pos-layout">
-      {/* Left: Products */}
+
+      {/* ── Left: Products panel ─────────────────────────────────────── */}
       <div className="pos-products-panel">
-        {/* Search & barcode */}
+
+        {/* Search bar */}
         <div className="pos-search-bar">
           <div className="search-bar">
             <i className="bi bi-search search-icon" />
             <input
               ref={searchInputRef}
-              type="text" className="search-input"
+              type="text"
+              className="search-input"
               placeholder="Search product or scan barcode..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            {search && <button className="search-clear" onClick={() => setSearch('')}><i className="bi bi-x" /></button>}
-            <button className="btn-scan" title="Focus for barcode scan"><i className="bi bi-upc-scan" /></button>
+            {search && (
+              <button className="search-clear" onClick={() => setSearch('')}>
+                <i className="bi bi-x" />
+              </button>
+            )}
+            <button className="btn-scan" title="Focus for barcode scan">
+              <i className="bi bi-upc-scan" />
+            </button>
           </div>
         </div>
 
-        {/* Categories */}
+        {/* Category tabs */}
         <div className="category-tabs">
           <button
             className={`category-tab ${!activeCategory ? 'active' : ''}`}
@@ -342,6 +356,10 @@ export default function POS() {
               onClick={() => {
                 if (p.is_weighable) { setShowWeigh(p); return }
                 addToCart(p)
+                // On mobile, briefly indicate item was added
+                if (window.innerWidth <= 768) {
+                  flash(`Added: ${p.name}`, 'success', 1200)
+                }
               }}
               disabled={!p.is_weighable && p.current_stock <= 0}
             >
@@ -355,31 +373,56 @@ export default function POS() {
                   {p.current_stock <= 0 ? 'Out of stock' : `Stock: ${p.current_stock}`}
                 </span>
               </div>
-              {p.is_weighable && <span className="weigh-badge"><i className="bi bi-speedometer" /></span>}
+              {p.is_weighable && (
+                <span className="weigh-badge"><i className="bi bi-speedometer" /></span>
+              )}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Right: Cart */}
-      <div className="pos-cart-panel">
+      {/* ── Mobile: cart overlay backdrop ───────────────────────────── */}
+      <div
+        className={`cart-drawer-overlay ${cartOpen ? '' : 'hidden'}`}
+        onClick={closeCart}
+      />
+
+      {/* ── Right: Cart panel (drawer on mobile) ─────────────────────── */}
+      <div className={`pos-cart-panel ${cartOpen ? 'cart-open' : ''}`}>
+
         {/* Cart header */}
         <div className="cart-header">
-          <h2><i className="bi bi-cart3" /> Cart <span className="cart-count">{cart.length}</span></h2>
+          <h2>
+            <i className="bi bi-cart3" />
+            Cart
+            <span className="cart-count">{cart.length}</span>
+          </h2>
           <div className="cart-actions">
             {/* Drawer status */}
             {drawer ? (
-              <span className="drawer-pill open"><i className="bi bi-safe2" /> Drawer Open</span>
+              <span className="drawer-pill open">
+                <i className="bi bi-safe2" /> Open
+              </span>
             ) : (
               <button className="drawer-pill closed" onClick={() => setShowOpenDrawer(true)}>
                 <i className="bi bi-safe2" /> Open Drawer
               </button>
             )}
             {cart.length > 0 && (
-              <button className="btn btn-ghost btn-sm" onClick={clearCart} title="Clear cart">
+              <button className="btn-icon" style={{ color: 'rgba(255,255,255,0.6)' }} onClick={clearCart} title="Clear cart">
                 <i className="bi bi-trash3" />
               </button>
             )}
+            {/* Mobile close button */}
+            <button
+              className="btn-icon"
+              style={{ color: 'rgba(255,255,255,0.7)', display: 'none' }}
+              id="cart-close-btn"
+              onClick={closeCart}
+              aria-label="Close cart"
+            >
+              <i className="bi bi-chevron-down" />
+            </button>
           </div>
         </div>
 
@@ -390,9 +433,14 @@ export default function POS() {
               <div className="customer-avatar">{customer.full_name[0]}</div>
               <div className="customer-details">
                 <span className="customer-name">{customer.full_name}</span>
-                <span className="customer-points"><i className="bi bi-award" /> {customer.loyalty_points} pts</span>
+                <span className="customer-points">
+                  <i className="bi bi-award" /> {customer.loyalty_points} pts
+                </span>
               </div>
-              <button className="btn-icon" onClick={e => { e.stopPropagation(); setCustomer(null); setPointsToRedeem(0) }}>
+              <button
+                className="btn-icon"
+                onClick={e => { e.stopPropagation(); setCustomer(null); setPointsToRedeem(0) }}
+              >
                 <i className="bi bi-x" />
               </button>
             </>
@@ -400,7 +448,7 @@ export default function POS() {
             <>
               <i className="bi bi-person-circle customer-placeholder-icon" />
               <span className="customer-placeholder">Walk-in customer — tap to add</span>
-              <i className="bi bi-chevron-right" />
+              <i className="bi bi-chevron-right" style={{ color: 'var(--gray-300)', fontSize: '0.8rem' }} />
             </>
           )}
         </div>
@@ -421,17 +469,28 @@ export default function POS() {
               </div>
               <div className="cart-item-controls">
                 <div className="qty-control">
-                  <button onClick={() => updateQty(item.product.id, item.quantity - 1)}><i className="bi bi-dash" /></button>
+                  <button onClick={() => updateQty(item.product.id, item.quantity - 1)}>
+                    <i className="bi bi-dash" />
+                  </button>
                   <input
-                    type="number" value={item.quantity} min="0.001"
+                    type="number"
+                    value={item.quantity}
+                    min="0.001"
                     step={item.product.unit === 'kg' ? '0.1' : '1'}
                     onChange={e => updateQty(item.product.id, Number(e.target.value))}
                     className="qty-input"
                   />
-                  <button onClick={() => updateQty(item.product.id, item.quantity + 1)}><i className="bi bi-plus" /></button>
+                  <button onClick={() => updateQty(item.product.id, item.quantity + 1)}>
+                    <i className="bi bi-plus" />
+                  </button>
                 </div>
-                <span className="cart-item-total">{fmt(item.product.selling_price * item.quantity - item.discount)}</span>
-                <button className="btn-icon btn-danger-icon" onClick={() => removeFromCart(item.product.id)}>
+                <span className="cart-item-total">
+                  {fmt(item.product.selling_price * item.quantity - item.discount)}
+                </span>
+                <button
+                  className="btn-icon btn-danger-icon"
+                  onClick={() => removeFromCart(item.product.id)}
+                >
                   <i className="bi bi-trash3" />
                 </button>
               </div>
@@ -455,16 +514,18 @@ export default function POS() {
                 <span>Points ({pointsToRedeem} pts)</span><span>- {fmt(pointsValue)}</span>
               </div>
             )}
-            <div className="total-row grand-total">
+            <div className="grand-total">
               <span>TOTAL</span><span>{fmt(total)}</span>
             </div>
-            {customer && <div className="points-earn-note">
-              <i className="bi bi-award" /> Customer will earn {pointsEarnable} loyalty points
-            </div>}
+            {customer && (
+              <div className="points-earn-note">
+                <i className="bi bi-award" /> Customer will earn {pointsEarnable} loyalty points
+              </div>
+            )}
           </div>
         )}
 
-        {/* Payment method */}
+        {/* Payment method selector */}
         {cart.length > 0 && (
           <div className="payment-methods">
             {PAYMENT_METHODS.map(pm => (
@@ -473,7 +534,8 @@ export default function POS() {
                 className={`payment-method-btn ${paymentMethod === pm.key ? 'active' : ''}`}
                 onClick={() => setPaymentMethod(pm.key)}
               >
-                <i className={`bi ${pm.icon}`} /><span>{pm.label}</span>
+                <i className={`bi ${pm.icon}`} />
+                <span>{pm.label}</span>
               </button>
             ))}
           </div>
@@ -489,23 +551,52 @@ export default function POS() {
         </button>
       </div>
 
-      {/* ── Checkout Modal ──────────────────────────────────────────────── */}
-      <Modal isOpen={showCheckout} onClose={() => setShowCheckout(false)} title="Complete Sale" size="md"
+      {/* ── Mobile FAB: open cart ────────────────────────────────────── */}
+      <button
+        className="cart-toggle-fab"
+        onClick={openCart}
+        aria-label={`Open cart (${cart.length} items)`}
+      >
+        <i className="bi bi-cart3" />
+        {cart.length > 0 && (
+          <span className="fab-badge">{cart.length}</span>
+        )}
+      </button>
+
+      {/* ── Checkout Modal ───────────────────────────────────────────── */}
+      <Modal
+        isOpen={showCheckout}
+        onClose={() => setShowCheckout(false)}
+        title="Complete Sale"
+        size="md"
         footer={
           <>
             <button className="btn btn-ghost" onClick={() => setShowCheckout(false)}>Cancel</button>
             <button className="btn btn-primary" onClick={handleCheckout} disabled={loading}>
-              {loading ? <><div className="spinner-ring spinner-sm" /> Processing...</> : <><i className="bi bi-bag-check-fill" /> Confirm Sale</>}
+              {loading
+                ? <><div className="spinner-ring spinner-sm" /> Processing...</>
+                : <><i className="bi bi-bag-check-fill" /> Confirm Sale</>}
             </button>
           </>
-        }>
+        }
+      >
         <div className="checkout-modal">
           <div className="checkout-summary">
             <div className="checkout-row"><span>Items</span><span>{cart.length}</span></div>
             <div className="checkout-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-            {discountAmount > 0 && <div className="checkout-row text-green"><span>Discount</span><span>-{fmt(discountAmount)}</span></div>}
-            {pointsToRedeem > 0 && <div className="checkout-row text-green"><span>Points Discount</span><span>-{fmt(pointsValue)}</span></div>}
-            <div className="checkout-row total-row"><span>TOTAL</span><strong>{fmt(total)}</strong></div>
+            {discountAmount > 0 && (
+              <div className="checkout-row text-green">
+                <span>Discount</span><span>-{fmt(discountAmount)}</span>
+              </div>
+            )}
+            {pointsToRedeem > 0 && (
+              <div className="checkout-row text-green">
+                <span>Points Discount</span><span>-{fmt(pointsValue)}</span>
+              </div>
+            )}
+            <div className="checkout-row total-row" style={{ fontWeight: 700, marginTop: 6 }}>
+              <span>TOTAL</span><strong>{fmt(total)}</strong>
+            </div>
           </div>
 
           <div className="checkout-payment">
@@ -516,8 +607,14 @@ export default function POS() {
                 <label className="form-label">Amount Tendered (KES)</label>
                 <div className="input-group">
                   <span className="input-icon"><i className="bi bi-cash-coin" /></span>
-                  <input type="number" className="form-input form-input-lg" value={amountPaid}
-                    onChange={e => setAmountPaid(e.target.value)} placeholder={total.toFixed(2)} autoFocus />
+                  <input
+                    type="number"
+                    className="form-input form-input-lg"
+                    value={amountPaid}
+                    onChange={e => setAmountPaid(e.target.value)}
+                    placeholder={total.toFixed(2)}
+                    autoFocus
+                  />
                 </div>
                 {amountPaid && Number(amountPaid) >= total && (
                   <div className="change-display">
@@ -542,8 +639,13 @@ export default function POS() {
                 <label className="form-label">Customer's Safaricom Number</label>
                 <div className="input-group">
                   <span className="input-icon"><i className="bi bi-phone" /></span>
-                  <input type="tel" className="form-input" value={mpesaPhone}
-                    onChange={e => setMpesaPhone(e.target.value)} placeholder="07XXXXXXXX" />
+                  <input
+                    type="tel"
+                    className="form-input"
+                    value={mpesaPhone}
+                    onChange={e => setMpesaPhone(e.target.value)}
+                    placeholder="07XXXXXXXX"
+                  />
                 </div>
                 <span className="form-hint">STK Push will be sent to this number</span>
               </div>
@@ -553,13 +655,24 @@ export default function POS() {
               <div className="form-field redeem-points-section">
                 <label className="form-label">
                   <i className="bi bi-award" /> Redeem Loyalty Points
-                  <span className="available-points">Available: {customer.loyalty_points} pts = {fmt(customer.loyalty_points)}</span>
+                  <span className="available-points">
+                    Available: {customer.loyalty_points} pts = {fmt(customer.loyalty_points)}
+                  </span>
                 </label>
                 <div className="input-group">
-                  <input type="number" className="form-input" value={pointsToRedeem}
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={pointsToRedeem}
                     onChange={e => setPointsToRedeem(Math.min(Number(e.target.value), customer.loyalty_points, total))}
-                    min="0" max={Math.min(customer.loyalty_points, total)} step="100" />
-                  <button className="btn btn-outline btn-sm" onClick={() => setPointsToRedeem(Math.min(customer.loyalty_points, Math.floor(total)))}>
+                    min="0"
+                    max={Math.min(customer.loyalty_points, total)}
+                    step="100"
+                  />
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setPointsToRedeem(Math.min(customer.loyalty_points, Math.floor(total)))}
+                  >
                     Max
                   </button>
                 </div>
@@ -569,21 +682,30 @@ export default function POS() {
             {/* Discount */}
             <div className="form-field">
               <label className="form-label">Discount</label>
-              <div className="discount-row">
-                <select className="form-select" value={discount.type} onChange={e => setDiscount(d => ({ ...d, type: e.target.value }))}>
+              <div className="discount-row-form">
+                <select
+                  className="form-select"
+                  value={discount.type}
+                  onChange={e => setDiscount(d => ({ ...d, type: e.target.value }))}
+                >
                   <option value="amount">Fixed (KES)</option>
                   <option value="percent">Percentage (%)</option>
                 </select>
-                <input type="number" className="form-input" value={discount.value}
+                <input
+                  type="number"
+                  className="form-input"
+                  value={discount.value}
                   onChange={e => setDiscount(d => ({ ...d, value: e.target.value }))}
-                  min="0" placeholder="0" />
+                  min="0"
+                  placeholder="0"
+                />
               </div>
             </div>
           </div>
         </div>
       </Modal>
 
-      {/* ── M-Pesa waiting modal ─────────────────────────────────────────── */}
+      {/* ── M-Pesa waiting modal ─────────────────────────────────────── */}
       <Modal isOpen={showMpesa} onClose={() => {}} title="M-Pesa Payment" size="sm">
         <div className="mpesa-modal">
           {mpesaStatus === 'pending' && (
@@ -613,8 +735,12 @@ export default function POS() {
         </div>
       </Modal>
 
-      {/* ── Receipt Modal ────────────────────────────────────────────────── */}
-      <Modal isOpen={showReceipt} onClose={() => setShowReceipt(false)} title="Sale Receipt" size="md"
+      {/* ── Receipt Modal ────────────────────────────────────────────── */}
+      <Modal
+        isOpen={showReceipt}
+        onClose={() => setShowReceipt(false)}
+        title="Sale Receipt"
+        size="md"
         footer={
           <>
             <button className="btn btn-ghost" onClick={() => setShowReceipt(false)}>Close</button>
@@ -622,21 +748,26 @@ export default function POS() {
               <i className="bi bi-printer" /> Print
             </button>
           </>
-        }>
+        }
+      >
         {completedSale && <Receipt sale={completedSale} />}
       </Modal>
 
-      {/* ── Customer Lookup Modal ────────────────────────────────────────── */}
+      {/* ── Customer Lookup Modal ────────────────────────────────────── */}
       <Modal isOpen={showCustomer} onClose={() => setShowCustomer(false)} title="Find Customer" size="sm">
         <div className="form-field">
           <div className="search-bar">
             <i className="bi bi-search search-icon" />
-            <input className="search-input" value={customerSearch}
+            <input
+              className="search-input"
+              value={customerSearch}
               onChange={e => searchCustomer(e.target.value)}
-              placeholder="Search by phone number..." autoFocus />
+              placeholder="Search by phone number..."
+              autoFocus
+            />
           </div>
         </div>
-        {customerLoading && <div className="spinner-ring" />}
+        {customerLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}><div className="spinner-ring" /></div>}
         {customerResults.map(c => (
           <div key={c.id} className="customer-result" onClick={() => selectCustomer(c)}>
             <div className="customer-result-avatar">{c.full_name[0]}</div>
@@ -650,35 +781,51 @@ export default function POS() {
           </div>
         ))}
         <div className="modal-footer-note">
-          <button className="btn btn-outline btn-full" onClick={() => { setShowCustomer(false); }}>
+          <button className="btn btn-outline btn-full" onClick={() => setShowCustomer(false)}>
             Continue as Walk-in
           </button>
         </div>
       </Modal>
 
-      {/* ── Open Drawer Modal ────────────────────────────────────────────── */}
-      <Modal isOpen={showOpenDrawer} onClose={() => setShowOpenDrawer(false)} title="Open Cash Drawer" size="sm"
+      {/* ── Open Drawer Modal ────────────────────────────────────────── */}
+      <Modal
+        isOpen={showOpenDrawer}
+        onClose={() => setShowOpenDrawer(false)}
+        title="Open Cash Drawer"
+        size="sm"
         footer={
           <>
             <button className="btn btn-ghost" onClick={() => setShowOpenDrawer(false)}>Cancel</button>
             <button className="btn btn-primary" onClick={handleOpenDrawer}>Open Drawer</button>
           </>
-        }>
+        }
+      >
         <div className="form-field">
           <label className="form-label">Opening Float (KES)</label>
-          <input type="number" className="form-input" value={openFloat}
-            onChange={e => setOpenFloat(e.target.value)} placeholder="e.g. 5000" autoFocus />
+          <input
+            type="number"
+            className="form-input"
+            value={openFloat}
+            onChange={e => setOpenFloat(e.target.value)}
+            placeholder="e.g. 5000"
+            autoFocus
+          />
         </div>
       </Modal>
 
-      {/* ── Weighable item modal ─────────────────────────────────────────── */}
+      {/* ── Weighable item modal ─────────────────────────────────────── */}
       {showWeigh && (
-        <WeighModal product={showWeigh} onAdd={(p, qty) => { addToCart(p, qty); setShowWeigh(null) }} onClose={() => setShowWeigh(null)} />
+        <WeighModal
+          product={showWeigh}
+          onAdd={(p, qty) => { addToCart(p, qty); setShowWeigh(null) }}
+          onClose={() => setShowWeigh(null)}
+        />
       )}
     </div>
   )
 }
 
+/* ── Receipt component ──────────────────────────────────────────────────── */
 function Receipt({ sale }) {
   return (
     <div className="receipt">
@@ -699,21 +846,56 @@ function Receipt({ sale }) {
           <div key={i} className="receipt-item">
             <span className="receipt-item-name">{item.product_name}</span>
             <span className="receipt-item-qty">x{item.quantity}</span>
-            <span className="receipt-item-price">KES {Number(item.line_total).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span>
+            <span className="receipt-item-price">
+              KES {Number(item.line_total).toLocaleString('en-KE', { minimumFractionDigits: 2 })}
+            </span>
           </div>
         ))}
       </div>
       <div className="receipt-divider" />
       <div className="receipt-totals">
-        <div><span>Subtotal</span><span>KES {Number(sale.subtotal).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span></div>
-        {Number(sale.discount_amount) > 0 && <div className="text-green"><span>Discount</span><span>-KES {Number(sale.discount_amount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span></div>}
-        {Number(sale.points_redeemed_value) > 0 && <div className="text-green"><span>Points Redeemed</span><span>-KES {Number(sale.points_redeemed_value).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span></div>}
-        <div><span>VAT (16%)</span><span>KES {Number(sale.tax_total).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span></div>
-        <div className="receipt-total"><span>TOTAL</span><strong>KES {Number(sale.total_amount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</strong></div>
-        <div><span>Paid ({sale.payment_method?.toUpperCase()})</span><span>KES {Number(sale.amount_paid).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span></div>
-        {Number(sale.change_given) > 0 && <div><span>Change</span><span>KES {Number(sale.change_given).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span></div>}
-        {sale.mpesa_reference && <div><span>M-Pesa Ref</span><span>{sale.mpesa_reference}</span></div>}
-        {sale.points_earned > 0 && <div className="text-primary"><span>Points Earned</span><span>+{sale.points_earned} pts</span></div>}
+        <div>
+          <span>Subtotal</span>
+          <span>KES {Number(sale.subtotal).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span>
+        </div>
+        {Number(sale.discount_amount) > 0 && (
+          <div className="text-green">
+            <span>Discount</span>
+            <span>-KES {Number(sale.discount_amount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span>
+          </div>
+        )}
+        {Number(sale.points_redeemed_value) > 0 && (
+          <div className="text-green">
+            <span>Points Redeemed</span>
+            <span>-KES {Number(sale.points_redeemed_value).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span>
+          </div>
+        )}
+        <div>
+          <span>VAT (16%)</span>
+          <span>KES {Number(sale.tax_total).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <div className="receipt-total">
+          <span>TOTAL</span>
+          <strong>KES {Number(sale.total_amount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</strong>
+        </div>
+        <div>
+          <span>Paid ({sale.payment_method?.toUpperCase()})</span>
+          <span>KES {Number(sale.amount_paid).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span>
+        </div>
+        {Number(sale.change_given) > 0 && (
+          <div>
+            <span>Change</span>
+            <span>KES {Number(sale.change_given).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</span>
+          </div>
+        )}
+        {sale.mpesa_reference && (
+          <div><span>M-Pesa Ref</span><span>{sale.mpesa_reference}</span></div>
+        )}
+        {sale.points_earned > 0 && (
+          <div className="text-primary">
+            <span>Points Earned</span><span>+{sale.points_earned} pts</span>
+          </div>
+        )}
       </div>
       <div className="receipt-footer">
         <p>Thank you for shopping at Naivas!</p>
@@ -724,24 +906,46 @@ function Receipt({ sale }) {
   )
 }
 
+/* ── Weigh modal ────────────────────────────────────────────────────────── */
 function WeighModal({ product, onAdd, onClose }) {
   const [weight, setWeight] = useState('')
+  const fmt = (n) => `KES ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`
   return (
-    <Modal isOpen onClose={onClose} title={`Enter Weight — ${product.name}`} size="sm"
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`Enter Weight — ${product.name}`}
+      size="sm"
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => weight > 0 && onAdd(product, Number(weight))}>
+          <button
+            className="btn btn-primary"
+            onClick={() => weight > 0 && onAdd(product, Number(weight))}
+          >
             Add to Cart
           </button>
         </>
-      }>
+      }
+    >
       <div className="form-field">
         <label className="form-label">Weight (kg)</label>
-        <input type="number" className="form-input form-input-lg" value={weight}
-          onChange={e => setWeight(e.target.value)} placeholder="0.000" step="0.001" min="0.001" autoFocus />
+        <input
+          type="number"
+          className="form-input form-input-lg"
+          value={weight}
+          onChange={e => setWeight(e.target.value)}
+          placeholder="0.000"
+          step="0.001"
+          min="0.001"
+          autoFocus
+        />
         <span className="form-hint">Price per kg: {fmt(product.selling_price)}</span>
-        {weight > 0 && <div className="weigh-preview">Total: <strong>{fmt(product.selling_price * weight)}</strong></div>}
+        {weight > 0 && (
+          <div className="weigh-preview">
+            Total: <strong>{fmt(product.selling_price * weight)}</strong>
+          </div>
+        )}
       </div>
     </Modal>
   )
